@@ -1,0 +1,12 @@
+^\.git$
+^\.gitignore$
+^\.github$
+^README\.Rmd$
+^Submission$
+^Submission\.md$
+^cran-comments\.md$
+^pkgdown$
+^_pkgdown\.yml$
+^\.local-tools$
+^.*\.Rcheck$
+^.*_[0-9.]+\.tar\.gz$
