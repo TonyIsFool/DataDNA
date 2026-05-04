@@ -89,8 +89,3 @@ From a local source tarball:
 ```r
 install.packages("DataDNA_0.1.0.tar.gz", repos = NULL, type = "source")
 ```
-
-## Design
-
-The profiling and comparison algorithms use base R. The HTML card uses the
-lightweight `htmltools` package so the result is portable and CRAN-friendly.

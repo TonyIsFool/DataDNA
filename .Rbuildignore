@@ -10,3 +10,4 @@
 ^\.local-tools$
 ^.*\.Rcheck$
 ^.*_[0-9.]+\.tar\.gz$
+^CRAN-SUBMISSION$
