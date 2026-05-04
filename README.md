@@ -70,7 +70,21 @@ dna_species(df)
 
 ## Installation
 
-From a local checkout:
+From GitHub:
+
+```r
+install.packages("devtools")
+devtools::install_github("TonyIsFool/DataDNA")
+```
+
+Or with the lighter `remotes` package:
+
+```r
+install.packages("remotes")
+remotes::install_github("TonyIsFool/DataDNA")
+```
+
+From a local source tarball:
 
 ```r
 install.packages("DataDNA_0.1.0.tar.gz", repos = NULL, type = "source")
