@@ -1,7 +1,8 @@
 #' Example customer tables
 #'
 #' Creates two small customer data frames designed to demonstrate DataDNA cards,
-#' comparison, and mutation reports.
+#' comparison, and mutation reports without altering the caller's random number
+#' generator state.
 #'
 #' @return A list with `customers_old` and `customers_new` data frames.
 #' @export
@@ -10,6 +11,18 @@
 #' demo <- dna_example_customers()
 #' str(demo$customers_old)
 dna_example_customers <- function() {
+  has_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (has_seed) {
+    old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    on.exit(assign(".Random.seed", old_seed, envir = .GlobalEnv), add = TRUE)
+  } else {
+    on.exit({
+      if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
+    }, add = TRUE)
+  }
+
   set.seed(42)
   n <- 180
   customers_old <- data.frame(

@@ -9,10 +9,12 @@ dna_diff(x, y)
 \item{y}{A data frame or \code{data_dna} object.}
 }
 \value{
-A \code{dna_diff} object containing a mutation table.
+A \code{dna_diff} object containing \code{changes} and \code{renames} tables.
 }
 \description{
-Explain mutations between two data DNA profiles.
+Detects schema changes, likely column renames, type and role transitions,
+missingness shifts, uniqueness changes, numeric distribution drift, category
+shifts, and temporal window drift between two data sets.
 }
 \examples{
 demo <- dna_example_customers()

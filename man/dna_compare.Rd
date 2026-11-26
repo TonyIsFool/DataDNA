@@ -12,7 +12,10 @@ dna_compare(x, y)
 A \code{dna_comparison} object.
 }
 \description{
-Compare two data DNA profiles.
+Computes a multi-signal fingerprint similarity between two data frames or
+\code{data_dna} profiles, combining schema overlap (including likely column
+renames), table shape, species, role structure, numeric distributions,
+missingness, categories, identity uniqueness, and temporal coverage.
 }
 \examples{
 demo <- dna_example_customers()

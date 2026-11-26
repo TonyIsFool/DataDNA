@@ -9,7 +9,8 @@ A list with \code{customers_old} and \code{customers_new} data frames.
 }
 \description{
 Creates two small customer data frames designed to demonstrate DataDNA cards,
-comparison, and mutation reports.
+comparison, and mutation reports without altering the caller's random number
+generator state.
 }
 \examples{
 demo <- dna_example_customers()

@@ -4,7 +4,7 @@
 #' against a named library of data frames or `data_dna` objects.
 #'
 #' @param x A data frame or `data_dna` object to match.
-#' @param library A list of data frames or `data_dna` objects.
+#' @param library A list (or `dna_library`) of data frames or `data_dna` objects.
 #' @param top_n Maximum number of matches to return.
 #' @param sample_size Maximum number of rows used when profiling raw data frames.
 #'
@@ -22,9 +22,11 @@ dna_match <- function(x, library, top_n = 5L, sample_size = 10000L) {
   if (!length(library)) {
     stop("`library` must contain at least one candidate data set.", call. = FALSE)
   }
-  stopifnot(length(top_n) == 1L, top_n >= 1L)
+  if (!is.numeric(top_n) || length(top_n) != 1L || is.na(top_n) || top_n < 1L) {
+    stop("`top_n` must be a single positive integer.", call. = FALSE)
+  }
 
-  query <- as_data_dna(x, name = deparse(substitute(x)), sample_size = sample_size)
+  query <- as_data_dna(x, name = paste(deparse(substitute(x)), collapse = " "), sample_size = sample_size)
   candidate_names <- match_library_names(library)
   comparisons <- vector("list", length(library))
   rows <- vector("list", length(library))
@@ -59,15 +61,16 @@ dna_match <- function(x, library, top_n = 5L, sample_size = 10000L) {
   )
 }
 
-#' Render a DataDNA lineage match card
+#' Render a precision-instrument interactive DataDNA lineage match card
 #'
-#' Creates a static HTML/SVG lineage diagram for a `dna_match` object.
+#' Creates a self-contained interactive HTML/SVG lineage instrument for a
+#' `dna_match` object without external runtime dependencies.
 #'
 #' @param match A `dna_match` object.
 #' @param file Optional HTML file path. If supplied, the card is saved there.
 #' @param open Logical. Open the saved file in a browser when `file` is supplied.
 #'
-#' @return An `htmltools` browsable object, invisibly when saved to `file`.
+#' @return A `dna_html` document object, invisibly when saved to `file`.
 #' @export
 #'
 #' @examples
@@ -82,14 +85,14 @@ dna_match_card <- function(match, file = NULL, open = FALSE) {
 
   card <- build_match_card(match)
   if (!is.null(file)) {
-    htmltools::save_html(card, file = file)
+    save_dna_html(card, file = file)
     if (isTRUE(open)) {
       utils::browseURL(normalizePath(file, winslash = "/", mustWork = FALSE))
     }
     return(invisible(card))
   }
 
-  htmltools::browsable(card)
+  card
 }
 
 #' @export
@@ -165,97 +168,151 @@ match_row <- function(name, candidate, comparison) {
     missingness = unname(comparison$scores[["missingness"]]),
     category = unname(comparison$scores[["category"]]),
     identity = unname(comparison$scores[["identity"]]),
+    temporal = unname(comparison$scores[["temporal"]]),
     top_mutations = I(list(comparison$top_mutations)),
     stringsAsFactors = FALSE
   )
 }
 
+best_relative_sentence <- function(best) {
+  if (isTRUE(best$is_self[[1L]])) {
+    paste0(best$name[[1L]], " matches the query specimen (", format_pct(best$overall[[1L]]), " similarity).")
+  } else {
+    paste0(best$name[[1L]], " is the nearest non-self relative with ", format_pct(best$overall[[1L]]), " similarity.")
+  }
+}
+
 build_match_card <- function(match) {
   best <- match$matches[1L, , drop = FALSE]
-  htmltools::tags$html(
-    htmltools::tags$head(
-      htmltools::tags$meta(charset = "utf-8"),
-      htmltools::tags$title(paste("DataDNA lineage", match$query$name)),
-      htmltools::tags$style(htmltools::HTML(match_card_css()))
+  doc <- html_tag(
+    "html",
+    lang = "en",
+    `data-theme` = "light",
+    html_tag(
+      "head",
+      html_tag("meta", charset = "utf-8", .void = TRUE),
+      html_tag("meta", name = "viewport", content = "width=device-width, initial-scale=1", .void = TRUE),
+      html_tag("title", paste("DataDNA lineage", match$query$name)),
+      html_tag("style", html_raw(match_card_css()))
     ),
-    htmltools::tags$body(
-      htmltools::tags$main(
+    html_tag(
+      "body",
+      html_tag(
+        "main",
         class = "dna-shell",
-        htmltools::tags$section(
+        html_tag(
+          "section",
           class = "dna-card lineage-report",
-          htmltools::tags$div(
-            class = "report-header",
-            htmltools::tags$div(
-              class = "report-title",
-              htmltools::tags$div(class = "kicker", "DataDNA lineage report"),
-              htmltools::tags$h1(match$query$name),
-              htmltools::tags$p(class = "dna-id", match$query$dna_id),
-              htmltools::tags$div(
-                class = "report-tags",
-                htmltools::tags$span(paste("Species", match$query$species, sep = ": ")),
-                htmltools::tags$span(paste("Rows", format(match$query$n_rows, big.mark = ","), sep = ": ")),
-                htmltools::tags$span(paste("Columns", match$query$n_cols, sep = ": "))
+          html_tag(
+            "div",
+            class = "top-rail",
+            html_tag("span", class = "led"),
+            html_tag("span", class = "kicker", "DataDNA lineage instrument // TE-SPEC 0.2"),
+            html_tag(
+              "button",
+              type = "button",
+              class = "theme-toggle",
+              id = "theme-toggle",
+              title = "Toggle light / dark instrument mode",
+              "MODE: LIGHT"
+            )
+          ),
+          html_tag(
+            "div",
+            class = "hero",
+            html_tag(
+              "div",
+              class = "hero-main",
+              html_tag("h1", match$query$name),
+              html_tag(
+                "div",
+                class = "meta-row",
+                html_tag(
+                  "button",
+                  type = "button",
+                  class = "dna-id copyable",
+                  `data-copy` = match$query$dna_id,
+                  title = "Click to copy DNA ID",
+                  match$query$dna_id
+                ),
+                html_tag("span", class = "meta-sep", "/"),
+                html_tag("span", class = "meta-txt", toupper(gsub("_", " ", match$query$species, fixed = TRUE))),
+                html_tag("span", class = "meta-sep", "/"),
+                html_tag("span", class = "meta-txt", paste0(format(match$query$n_rows, big.mark = ","), " x ", match$query$n_cols))
               )
             ),
-            htmltools::tags$div(
+            html_tag(
+              "div",
               class = "best-card",
-              htmltools::tags$span("Closest relative"),
-              htmltools::tags$strong(best$name),
-              htmltools::tags$div(
+              html_tag("span", "CLOSEST RELATIVE"),
+              html_tag(
+                "div",
                 class = "best-score",
-                htmltools::tags$em(format_pct(best$overall)),
-                htmltools::tags$b(best$relation)
+                html_tag("em", format_pct(best$overall)),
+                html_tag("strong", best$name)
               )
             )
           ),
-          htmltools::tags$div(
+          html_tag(
+            "div",
             class = "report-metrics",
             lineage_stat("Relation", best$relation, "relation"),
             lineage_stat("Similarity", format_pct(best$overall), "score"),
-            lineage_stat("Best species", best$species, "species"),
-            lineage_stat("Candidates scanned", nrow(match$matches), "count")
+            lineage_stat("Best species", toupper(gsub("_", " ", best$species, fixed = TRUE)), "species"),
+            lineage_stat("Candidates", nrow(match$matches), "count")
           ),
-          htmltools::tags$div(
+          html_tag(
+            "div",
             class = "report-body",
-            htmltools::tags$div(
+            html_tag(
+              "div",
               class = "lineage-panel lineage-graph-panel",
-              htmltools::tags$div(
-                class = "panel-heading",
-                htmltools::tags$span("Lineage map"),
-                htmltools::tags$h2("Similarity-weighted candidate graph")
+              html_tag(
+                "div",
+                class = "panel-head",
+                html_tag("h2", "01  SIGNAL ROUTING & ELECTROPHORESIS"),
+                html_tag("span", class = "panel-sub", "HOVER OR CLICK TO INSPECT")
               ),
-              htmltools::HTML(lineage_svg(match))
+              html_raw(lineage_svg(match))
             ),
-            htmltools::tags$div(
+            html_tag(
+              "div",
               class = "lineage-panel lineage-rank",
-              htmltools::tags$div(
-                class = "panel-heading",
-                htmltools::tags$span("Ranked relatives"),
-                htmltools::tags$h2("Candidate ranking")
+              html_tag(
+                "div",
+                class = "panel-head",
+                html_tag("h2", "02  CANDIDATE RANKING"),
+                html_tag("span", class = "panel-sub", paste0(nrow(match$matches), " EVALUATED"))
               ),
               match_table(match)
             )
           ),
-          htmltools::tags$div(
+          html_tag(
+            "div",
             class = "lineage-summary",
-            htmltools::tags$div(
-              class = "panel-heading",
-              htmltools::tags$span("Interpretation"),
-              htmltools::tags$h2("Mutation summary")
+            html_tag(
+              "div",
+              class = "panel-head",
+              html_tag("h2", "03  MUTATION TELEMETRY"),
+              html_tag("span", class = "panel-sub", id = "summary-active-label", toupper(best$name))
             ),
             mutation_summary(match)
           )
-        )
-      )
+        ),
+        html_tag("div", class = "toast", id = "dna-toast", role = "status", `aria-live` = "polite")
+      ),
+      html_tag("script", type = "text/javascript", html_raw(match_card_js()))
     )
   )
+  new_dna_html(doc, title = paste("DataDNA lineage", match$query$name))
 }
 
 lineage_stat <- function(label, value, kind) {
-  htmltools::tags$div(
+  html_tag(
+    "div",
     class = paste("lineage-stat", kind),
-    htmltools::tags$span(label),
-    htmltools::tags$strong(value)
+    html_tag("span", label),
+    html_tag("strong", as.character(value))
   )
 }
 
@@ -264,151 +321,150 @@ short_label <- function(x, width = 26L) {
   ifelse(nchar(x, type = "width") > width, paste0(substr(x, 1L, width - 1L), "..."), x)
 }
 
+svg_mini_gel <- function(x, y, w, h, seed_str, n_bars = 28L, bar_class = "gel-bar") {
+  vals <- hash_to_unit_seq(seed_str, n_bars)
+  slot <- w / n_bars
+  rects <- character(n_bars)
+  for (i in seq_len(n_bars)) {
+    v <- vals[[i]]
+    bh <- h * (0.25 + 0.75 * v)
+    bw <- slot * (0.35 + 0.35 * v)
+    bx <- x + (i - 0.5) * slot - bw / 2
+    by <- y - bh / 2
+    rects[[i]] <- sprintf(
+      "<rect class='%s' x='%.1f' y='%.1f' width='%.1f' height='%.1f' opacity='%.2f'/>",
+      bar_class, bx, by, bw, bh, 0.25 + 0.70 * v
+    )
+  }
+  paste(rects, collapse = "")
+}
+
 lineage_svg <- function(match) {
   matches <- match$matches
   n <- nrow(matches)
-  width <- 960
-  height <- max(330, 130 + n * 92)
-  query_x <- 72
+  width <- 900
+  height <- max(320, 100 + n * 86)
+  query_x <- 34
   query_y <- height / 2
-  query_w <- 250
-  query_h <- 104
-  cand_x <- 606
-  cand_w <- 292
-  cand_h <- 78
-  cand_y <- if (n == 1L) height / 2 else seq(86, height - 86, length.out = n)
+  query_w <- 224
+  query_h <- 126
+  cand_x <- 378
+  cand_w <- 488
+  cand_h <- 68
+  cand_y <- if (n == 1L) height / 2 else seq(72, height - 72, length.out = n)
 
   lines <- character(n)
   nodes <- character(n)
   for (i in seq_len(n)) {
-    score <- matches$overall[[i]]
-    color <- relation_color(score)
-    stroke <- 1.4 + 3.4 * clip01(score)
-    label <- htmltools::htmlEscape(short_label(matches$name[[i]], 24L))
-    relation <- htmltools::htmlEscape(matches$relation[[i]])
+    score <- clip01(matches$overall[[i]])
+    stroke <- if (i == 1L) 2.2 else (0.9 + 1.2 * score)
+    label <- html_escape(short_label(matches$name[[i]], 20L), attr = TRUE)
+    relation <- html_escape(matches$relation[[i]], attr = TRUE)
     pct <- format_pct(score)
     y_top <- cand_y[[i]] - cand_h / 2
+    idx <- i - 1L
+    cls_edge <- if (i == 1L) "edge-path is-best" else "edge-path"
+    cls_node <- if (i == 1L) "cand-node is-best" else "cand-node"
+
     lines[[i]] <- sprintf(
-      "<path d='M %s %s C %s %s, %s %s, %s %s' stroke='%s' stroke-width='%.1f' fill='none' opacity='.86'/>",
-      query_x + query_w,
-      query_y,
-      query_x + query_w + 88,
-      query_y,
-      cand_x - 94,
-      cand_y[[i]],
-      cand_x,
-      cand_y[[i]],
-      color,
+      "<path class='%s' data-idx='%d' d='M %s %s C %s %s, %s %s, %s %s' stroke-width='%.1f' fill='none'/>",
+      cls_edge, idx,
+      query_x + query_w, query_y,
+      query_x + query_w + 56, query_y,
+      cand_x - 56, cand_y[[i]],
+      cand_x, cand_y[[i]],
       stroke
     )
+
+    gel_svg <- svg_mini_gel(
+      cand_x + 216, cand_y[[i]], 182, 26,
+      paste(matches$dna_id[[i]], matches$name[[i]]),
+      n_bars = 32L,
+      bar_class = if (i == 1L) "gel-bar best-bar" else "gel-bar"
+    )
+
     nodes[[i]] <- sprintf(
       paste0(
-        "<g>",
-        "<rect x='%s' y='%s' width='%s' height='%s' rx='12' fill='#111b25' stroke='%s' stroke-width='1.2'/>",
-        "<rect x='%s' y='%s' width='4' height='%s' rx='2' fill='%s'/>",
+        "<g class='%s' data-idx='%d' tabindex='0'>",
+        "<rect class='node-box' x='%s' y='%s' width='%s' height='%s' rx='2'/>",
+        "<rect class='node-accent' x='%s' y='%s' width='4' height='%s'/>",
         "<text x='%s' y='%s' class='node-title'>%s</text>",
         "<text x='%s' y='%s' class='node-sub'>%s</text>",
+        "%s",
         "<text x='%s' y='%s' text-anchor='end' class='node-score'>%s</text>",
         "</g>"
       ),
-      cand_x,
-      y_top,
-      cand_w,
-      cand_h,
-      color,
-      cand_x,
-      y_top + 16,
-      cand_h - 32,
-      color,
-      cand_x + 22,
-      cand_y[[i]] - 8,
-      label,
-      cand_x + 22,
-      cand_y[[i]] + 14,
-      relation,
-      cand_x + cand_w - 20,
-      cand_y[[i]] + 2,
-      pct
+      cls_node, idx,
+      cand_x, y_top, cand_w, cand_h,
+      cand_x, y_top, cand_h,
+      cand_x + 18, cand_y[[i]] - 6, label,
+      cand_x + 18, cand_y[[i]] + 14, relation,
+      gel_svg,
+      cand_x + cand_w - 16, cand_y[[i]] + 6, pct
     )
   }
 
-  query_label <- htmltools::htmlEscape(short_label(match$query$name, 22L))
+  query_label <- html_escape(short_label(match$query$name, 18L), attr = TRUE)
+  query_id <- html_escape(match$query$dna_id, attr = TRUE)
+  query_gel <- svg_mini_gel(query_x + 16, query_y + 38, query_w - 32, 22, match$query$dna_id, n_bars = 28L, bar_class = "gel-bar query-bar")
+
   sprintf(
     paste0(
       "<svg class='lineage-svg' viewBox='0 0 %s %s' role='img' aria-label='DataDNA lineage graph'>",
-      "<style>",
-      ".node-title{font:600 14px Inter,Segoe UI,Helvetica Neue,Arial,sans-serif;fill:#eef3f6;}",
-      ".node-score{font:700 20px Inter,Segoe UI,Helvetica Neue,Arial,sans-serif;fill:#eef3f6;}",
-      ".node-sub{font:12px Inter,Segoe UI,Helvetica Neue,Arial,sans-serif;fill:#9aa8b5;}",
-      ".query-title{font:700 16px Inter,Segoe UI,Helvetica Neue,Arial,sans-serif;fill:#eef3f6;}",
-      ".query-sub{font:12px SFMono-Regular,Consolas,Liberation Mono,monospace;fill:#9aa8b5;}",
-      ".section-label{font:600 11px Inter,Segoe UI,Helvetica Neue,Arial,sans-serif;fill:#6f7a86;}",
-      "</style>",
-      "<defs>",
-      "<pattern id='grid' width='40' height='40' patternUnits='userSpaceOnUse'>",
-      "<path d='M 40 0 L 0 0 0 40' fill='none' stroke='rgba(255,255,255,.035)' stroke-width='1'/>",
-      "</pattern>",
-      "</defs>",
-      "<rect width='100%%' height='100%%' rx='18' fill='#0f1720'/>",
-      "<rect width='100%%' height='100%%' rx='18' fill='url(#grid)'/>",
-      "<text x='%s' y='42' class='section-label'>QUERY SPECIMEN</text>",
-      "<text x='%s' y='42' class='section-label'>RELATIVE CANDIDATES</text>",
+      "<rect class='svg-bg' width='100%%' height='100%%' rx='2'/>",
+      "<text x='%s' y='28' class='section-label'>QUERY MODULE</text>",
+      "<text x='%s' y='28' class='section-label'>CANDIDATE ELECTROPHORESIS STRIPS</text>",
       "%s",
-      "<g>",
-      "<rect x='%s' y='%s' width='%s' height='%s' rx='14' fill='#121d28' stroke='#66d9c2' stroke-width='1.4'/>",
-      "<rect x='%s' y='%s' width='4' height='%s' rx='2' fill='#66d9c2'/>",
+      "<g class='query-node'>",
+      "<rect class='query-box' x='%s' y='%s' width='%s' height='%s' rx='2'/>",
+      "<rect class='query-led' x='%s' y='%s' width='12' height='4'/>",
       "<text x='%s' y='%s' class='query-title'>%s</text>",
       "<text x='%s' y='%s' class='query-sub'>%s</text>",
-      "<text x='%s' y='%s' class='node-sub'>%s</text>",
+      "%s",
       "</g>",
       "%s",
       "</svg>"
     ),
-    width,
-    height,
-    query_x,
-    cand_x,
+    width, height,
+    query_x, cand_x,
     paste(lines, collapse = ""),
-    query_x,
-    query_y - query_h / 2,
-    query_w,
-    query_h,
-    query_x,
-    query_y - query_h / 2 + 18,
-    query_h - 36,
-    query_x + 24,
-    query_y - 14,
-    query_label,
-    query_x + 24,
-    query_y + 10,
-    match$query$dna_id,
-    query_x + 24,
-    query_y + 34,
-    match$query$species,
+    query_x, query_y - query_h / 2, query_w, query_h,
+    query_x + 16, query_y - query_h / 2 + 16,
+    query_x + 16, query_y - 12, query_label,
+    query_x + 16, query_y + 8, query_id,
+    query_gel,
     paste(nodes, collapse = "")
   )
 }
 
 match_table <- function(match) {
-  htmltools::tags$div(
+  html_tag(
+    "div",
     class = "rank-list",
     lapply(seq_len(nrow(match$matches)), function(i) {
       mutations <- match$matches$top_mutations[[i]]
-      score <- match$matches$overall[[i]]
-      htmltools::tags$article(
-        class = "rank-card",
-        htmltools::tags$div(
+      score <- clip01(match$matches$overall[[i]])
+      html_tag(
+        "article",
+        class = if (i == 1L) "rank-card selected" else "rank-card",
+        `data-idx` = as.character(i - 1L),
+        `data-name` = toupper(match$matches$name[[i]]),
+        `data-relation` = match$matches$relation[[i]],
+        `data-sentence` = best_relative_sentence(match$matches[i, , drop = FALSE]),
+        `data-mutations` = if (length(mutations)) paste(utils::head(mutations, 5L), collapse = "\n") else "No notable mutations detected.",
+        html_tag(
+          "div",
           class = "rank-topline",
-          htmltools::tags$span(class = "rank-index", sprintf("%02d", i)),
-          htmltools::tags$strong(match$matches$name[[i]]),
-          htmltools::tags$em(format_pct(score))
+          html_tag("span", class = "rank-index", sprintf("%02d", i)),
+          html_tag("strong", match$matches$name[[i]]),
+          html_tag("em", format_pct(score))
         ),
-        htmltools::tags$div(
+        html_tag(
+          "div",
           class = "rank-meter",
-          htmltools::tags$i(style = paste0("width:", round(100 * clip01(score)), "%; background:", relation_color(score), ";"))
+          html_tag("i", style = paste0("width:", round(100 * score), "%;"))
         ),
-        htmltools::tags$p(match$matches$relation[[i]]),
-        htmltools::tags$small(if (length(mutations)) paste(utils::head(mutations, 2L), collapse = " | ") else "No notable mutations")
+        html_tag("p", match$matches$relation[[i]])
       )
     })
   )
@@ -421,336 +477,210 @@ mutation_summary <- function(match) {
     notes <- "No notable mutations detected for the closest relative."
   }
 
-  htmltools::tags$div(
+  html_tag(
+    "div",
     class = "summary-grid",
-    htmltools::tags$div(
+    html_tag(
+      "div",
       class = "summary-callout",
-      htmltools::tags$span("Best lineage interpretation"),
-      htmltools::tags$strong(best$relation),
-      htmltools::tags$p(paste0(best$name, " is the nearest non-self relative with ", format_pct(best$overall), " similarity."))
+      html_tag("span", "INTERPRETATION"),
+      html_tag("strong", id = "summary-relation", best$relation),
+      html_tag("p", id = "summary-sentence", best_relative_sentence(best))
     ),
-    htmltools::tags$ul(
+    html_tag(
+      "ul",
       class = "summary-notes",
-      lapply(utils::head(notes, 4L), htmltools::tags$li)
+      id = "summary-notes",
+      lapply(utils::head(notes, 4L), function(item) html_tag("li", item))
     )
   )
-}
-
-relation_label_class <- function(score) {
-  if (score >= 0.97) {
-    "near"
-  } else if (score >= 0.85) {
-    "changed"
-  } else if (score >= 0.65) {
-    "related"
-  } else {
-    "different"
-  }
-}
-
-relation_color <- function(score) {
-  if (score >= 0.97) {
-    "#66d9c2"
-  } else if (score >= 0.85) {
-    "#69a7d8"
-  } else if (score >= 0.65) {
-    "#d8b85f"
-  } else {
-    "#6f7a86"
-  }
-}
-
-risk_from_similarity <- function(score) {
-  if (score >= 0.85) "low" else if (score >= 0.65) "medium" else "high"
 }
 
 match_card_css <- function() {
   paste0(
     dna_card_css(),
     "
-    body {
-      color: #eef3f6;
-      background:
-        radial-gradient(circle at 18% 0%, rgba(102, 217, 194, .08), transparent 360px),
-        linear-gradient(180deg, #0b1118 0%, #101923 100%);
-      font-family: Inter, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    }
-    .dna-shell {
-      width: min(1180px, calc(100vw - 40px));
-      margin: 28px auto;
-    }
-    .lineage-report {
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 8px;
-      background: #0f1720;
-      box-shadow: 0 28px 90px rgba(0,0,0,.34);
-    }
-    .report-header {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 320px;
-      gap: 28px;
-      padding: 34px 36px 30px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
-    }
-    .report-title h1 {
-      margin: 10px 0 8px;
-      color: #eef3f6;
-      font-size: 40px;
-      line-height: 1.05;
-      font-weight: 700;
-      letter-spacing: 0;
-    }
-    .kicker {
-      color: #66d9c2;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0;
-    }
-    .dna-id {
-      margin: 0;
-      color: #9aa8b5;
-      font-family: SFMono-Regular, Consolas, 'Liberation Mono', monospace;
-      font-size: 14px;
-    }
-    .report-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 20px;
-    }
-    .report-tags span {
-      padding: 7px 10px;
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 6px;
-      color: #cdd6de;
-      background: rgba(255,255,255,.035);
-      font-size: 12px;
-    }
-    .best-card {
-      align-self: stretch;
-      display: grid;
-      align-content: center;
-      gap: 12px;
-      padding: 24px;
-      border: 1px solid rgba(102,217,194,.28);
-      border-radius: 8px;
-      background: #101923;
-    }
-    .best-card > span {
-      color: #9aa8b5;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .best-card > strong {
-      color: #eef3f6;
-      font-size: 28px;
-      line-height: 1.08;
-      font-weight: 700;
-    }
-    .best-score {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-    }
-    .best-score em {
-      color: #66d9c2;
-      font-size: 40px;
-      line-height: .95;
-      font-style: normal;
-      font-weight: 700;
-    }
-    .best-score b {
-      color: #9aa8b5;
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.25;
-      padding-bottom: 4px;
-    }
+    .dna-shell { width: min(1160px, calc(100vw - 32px)); }
+    .best-card { text-align: right; }
+    .best-card > span { display: block; font-size: 10px; color: var(--ink-3); letter-spacing: .1em; }
+    .best-score { display: flex; align-items: baseline; justify-content: flex-end; gap: 12px; margin-top: 4px; }
+    .best-score em { color: var(--signal); font-size: 34px; line-height: 1; font-style: normal; font-weight: 700; }
+    .best-score strong { font-size: 13px; color: var(--ink); font-weight: 700; }
     .report-metrics {
       display: grid;
-      grid-template-columns: 1.35fr .7fr .9fr .65fr;
+      grid-template-columns: 1.4fr .7fr 1fr .65fr;
       gap: 1px;
-      background: rgba(255,255,255,.10);
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
     }
-    .lineage-stat {
-      min-width: 0;
-      padding: 18px 24px;
-      background: #101923;
-    }
-    .lineage-stat span {
-      display: block;
-      color: #9aa8b5;
-      font-size: 12px;
-      font-weight: 650;
-      text-transform: uppercase;
-    }
-    .lineage-stat strong {
-      display: block;
-      margin-top: 7px;
-      color: #eef3f6;
-      font-size: 16px;
-      line-height: 1.25;
-      font-weight: 650;
-    }
+    .lineage-stat { padding: 14px 28px; background: var(--surface); }
+    .lineage-stat span { display: block; font-size: 10px; color: var(--ink-3); letter-spacing: .1em; text-transform: uppercase; }
+    .lineage-stat strong { display: block; margin-top: 4px; font-size: 13px; color: var(--ink); font-weight: 700; }
     .report-body {
       display: grid;
-      grid-template-columns: minmax(0, 1.45fr) minmax(320px, .75fr);
-      gap: 20px;
-      padding: 24px;
+      grid-template-columns: minmax(0, 1.55fr) minmax(260px, .65fr);
+      gap: 24px;
+      padding: 24px 28px;
     }
-    .lineage-panel,
-    .lineage-summary {
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 8px;
-      background: rgba(255,255,255,.025);
-    }
-    .lineage-panel {
-      padding: 20px;
-    }
-    .panel-heading {
-      margin-bottom: 16px;
-    }
-    .panel-heading span {
-      display: block;
-      color: #66d9c2;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .panel-heading h2 {
-      margin: 6px 0 0;
-      color: #eef3f6;
-      font-size: 20px;
-      line-height: 1.2;
-      font-weight: 650;
-      letter-spacing: 0;
-    }
-    .lineage-svg {
-      display: block;
-      width: 100%;
-      height: auto;
-      min-height: 330px;
-    }
-    .rank-list {
-      display: grid;
-      gap: 12px;
-    }
+    .lineage-svg { display: block; width: 100%; height: auto; min-height: 300px; }
+    .svg-bg { fill: var(--well); stroke: var(--border); stroke-width: 1; }
+    .section-label { font: 700 10px 'SF Mono', ui-monospace, Consolas, monospace; fill: var(--ink-3); letter-spacing: .08em; }
+    .query-box { fill: var(--ink); }
+    .query-led { fill: var(--signal); }
+    .query-title { font: 700 15px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; fill: var(--plate); }
+    .query-sub { font: 11px 'SF Mono', ui-monospace, Consolas, monospace; fill: var(--ink-3); }
+    .query-bar { fill: var(--plate); }
+    .node-box { fill: var(--surface); stroke: var(--border); stroke-width: 1; transition: stroke .14s ease; }
+    .node-accent { fill: var(--ink-3); transition: fill .14s ease; }
+    .cand-node.is-best .node-accent, .cand-node.active .node-accent { fill: var(--signal); }
+    .cand-node.active .node-box { stroke: var(--ink); stroke-width: 1.5; }
+    .node-title { font: 700 13.5px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; fill: var(--ink); }
+    .node-sub { font: 11px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; fill: var(--ink-2); }
+    .node-score { font: 700 17px 'SF Mono', ui-monospace, Consolas, monospace; fill: var(--ink); }
+    .cand-node.is-best .node-score, .cand-node.active .node-score { fill: var(--signal); }
+    .gel-bar { fill: var(--ink); }
+    .gel-bar.best-bar { fill: var(--signal); }
+    .edge-path { stroke: var(--ink); opacity: .45; transition: opacity .14s ease, stroke .14s ease; }
+    .edge-path.is-best, .edge-path.active { stroke: var(--signal); opacity: 1; }
+    .edge-path.dimmed { opacity: .12; }
+    .cand-node { cursor: pointer; transition: opacity .14s ease; }
+    .cand-node.dimmed { opacity: .3; }
+    .rank-list { display: grid; gap: 8px; }
     .rank-card {
-      padding: 14px;
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 8px;
-      background: #111b25;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color .14s ease, opacity .14s ease;
     }
-    .rank-topline {
-      display: grid;
-      grid-template-columns: 34px minmax(0, 1fr) auto;
-      align-items: baseline;
-      gap: 10px;
-    }
-    .rank-index {
-      color: #6f7a86;
-      font-family: SFMono-Regular, Consolas, 'Liberation Mono', monospace;
-      font-size: 12px;
-    }
-    .rank-topline strong {
-      min-width: 0;
-      color: #eef3f6;
-      font-size: 16px;
-      font-weight: 650;
-      overflow-wrap: anywhere;
-    }
-    .rank-topline em {
-      color: #66d9c2;
-      font-size: 16px;
-      font-style: normal;
-      font-weight: 700;
-    }
-    .rank-meter {
-      height: 4px;
-      margin: 11px 0 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      overflow: hidden;
-    }
-    .rank-meter i {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-    }
-    .rank-card p {
-      margin: 0 0 7px;
-      color: #cdd6de;
-      font-size: 14px;
-      line-height: 1.35;
-    }
-    .rank-card small {
-      color: #9aa8b5;
-      font-size: 12px;
-      line-height: 1.35;
-    }
-    .lineage-summary {
-      margin: 0 24px 24px;
-      padding: 20px;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
-      gap: 20px;
-    }
-    .summary-callout {
-      padding: 16px;
-      border-radius: 8px;
-      background: #101923;
-      border: 1px solid rgba(255,255,255,.10);
-    }
-    .summary-callout span {
-      color: #9aa8b5;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .summary-callout strong {
-      display: block;
-      margin-top: 8px;
-      color: #eef3f6;
-      font-size: 20px;
-      line-height: 1.2;
-    }
-    .summary-callout p {
-      margin: 10px 0 0;
-      color: #9aa8b5;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-    .summary-notes {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 8px;
-    }
-    .summary-notes li {
-      padding: 11px 13px;
-      border-radius: 6px;
-      color: #cdd6de;
-      background: rgba(255,255,255,.035);
-      border: 1px solid rgba(255,255,255,.08);
-      font-size: 14px;
-      line-height: 1.35;
-    }
-    @media (max-width: 920px) {
-      .report-header,
-      .report-body,
-      .summary-grid {
-        grid-template-columns: 1fr;
-      }
-      .report-metrics {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .rank-card:hover { border-color: var(--ink); }
+    .rank-card.selected { border-color: var(--ink); border-left: 3px solid var(--signal); }
+    .rank-card.dimmed { opacity: .38; }
+    .rank-topline { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+    .rank-index { font-size: 11px; color: var(--ink-3); }
+    .rank-topline strong { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+    .rank-topline em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--ink); }
+    .rank-card.selected .rank-topline em { color: var(--signal); }
+    .rank-meter { height: 2px; margin: 9px 0 7px; background: var(--border); }
+    .rank-meter i { display: block; height: 100%; background: var(--ink); }
+    .rank-card.selected .rank-meter i { background: var(--signal); }
+    .rank-card p { margin: 0; font-size: 11px; color: var(--ink-2); }
+    .lineage-summary { padding: 0 28px 28px; }
+    .summary-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 20px; }
+    .summary-callout { padding: 16px; border: 1px solid var(--border); background: var(--surface); }
+    .summary-callout span { font-size: 10px; color: var(--ink-3); letter-spacing: .1em; }
+    .summary-callout strong { display: block; margin-top: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; font-size: 16px; }
+    .summary-callout p { margin: 8px 0 0; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+    .summary-notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+    .summary-notes li { padding: 9px 12px; border-left: 2px solid var(--signal); background: var(--surface); font-size: 12px; color: var(--ink-2); }
+    @media (max-width: 900px) {
+      .report-body, .summary-grid { grid-template-columns: 1fr; }
+      .report-metrics { grid-template-columns: repeat(2, 1fr); }
     }
     "
   )
+}
+
+match_card_js <- function() {
+  "
+  (function() {
+    var root = document.documentElement;
+    var toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function() {
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        toggle.textContent = next === 'dark' ? 'MODE: DARK' : 'MODE: LIGHT';
+      });
+    }
+
+    var toast = document.getElementById('dna-toast');
+    var timer = null;
+    function showToast(msg) {
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(function() { toast.classList.remove('show'); }, 1400);
+    }
+
+    document.querySelectorAll('.copyable').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var val = el.getAttribute('data-copy') || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(val).then(function() { showToast('COPIED ' + val); });
+        } else {
+          showToast(val);
+        }
+      });
+    });
+
+    var nodes = document.querySelectorAll('.cand-node');
+    var edges = document.querySelectorAll('.edge-path');
+    var cards = document.querySelectorAll('.rank-card');
+    var activeLabel = document.getElementById('summary-active-label');
+    var sumRel = document.getElementById('summary-relation');
+    var sumSent = document.getElementById('summary-sentence');
+    var sumNotes = document.getElementById('summary-notes');
+    var selectedIdx = '0';
+
+    function setHover(idx) {
+      var target = idx !== null ? String(idx) : null;
+      nodes.forEach(function(n) {
+        var m = n.getAttribute('data-idx') === target;
+        n.classList.toggle('active', target !== null ? m : n.getAttribute('data-idx') === selectedIdx);
+        n.classList.toggle('dimmed', target !== null && !m);
+      });
+      edges.forEach(function(e) {
+        var m = e.getAttribute('data-idx') === target;
+        e.classList.toggle('active', target !== null ? m : e.getAttribute('data-idx') === selectedIdx);
+        e.classList.toggle('dimmed', target !== null && !m);
+      });
+      cards.forEach(function(c) {
+        var m = c.getAttribute('data-idx') === target;
+        c.classList.toggle('dimmed', target !== null && !m);
+      });
+    }
+
+    function selectCandidate(idx) {
+      selectedIdx = String(idx);
+      cards.forEach(function(c) {
+        var isSel = c.getAttribute('data-idx') === selectedIdx;
+        c.classList.toggle('selected', isSel);
+        if (isSel) {
+          if (activeLabel) activeLabel.textContent = c.getAttribute('data-name') || '';
+          if (sumRel) sumRel.textContent = c.getAttribute('data-relation') || '';
+          if (sumSent) sumSent.textContent = c.getAttribute('data-sentence') || '';
+          if (sumNotes) {
+            var lines = (c.getAttribute('data-mutations') || '').split('\\n').filter(Boolean);
+            sumNotes.innerHTML = '';
+            lines.forEach(function(line) {
+              var li = document.createElement('li');
+              li.textContent = line;
+              sumNotes.appendChild(li);
+            });
+          }
+        }
+      });
+      setHover(null);
+    }
+
+    nodes.forEach(function(n) {
+      var idx = n.getAttribute('data-idx');
+      n.addEventListener('mouseenter', function() { setHover(idx); });
+      n.addEventListener('mouseleave', function() { setHover(null); });
+      n.addEventListener('click', function() { selectCandidate(idx); });
+    });
+
+    cards.forEach(function(c) {
+      var idx = c.getAttribute('data-idx');
+      c.addEventListener('mouseenter', function() { setHover(idx); });
+      c.addEventListener('mouseleave', function() { setHover(null); });
+      c.addEventListener('click', function() { selectCandidate(idx); });
+    });
+
+    setHover(null);
+  })();
+  "
 }

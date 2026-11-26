@@ -1,14 +1,14 @@
 # DataDNA CRAN Check Summary
 
 Package: DataDNA
-Version: 0.1.0
+Version: 0.2.0
 Maintainer: Tony Lu <xulunt123@gmail.com>
 
 ## Commands
 
 ```sh
-R CMD build --user=DataDNA Package1
-R CMD check DataDNA_0.1.0.tar.gz --as-cran
+R CMD build --user=DataDNA DataDNA
+R CMD check DataDNA_0.2.0.tar.gz --as-cran --no-manual
 ```
 
 ## Result
@@ -16,29 +16,13 @@ R CMD check DataDNA_0.1.0.tar.gz --as-cran
 ```text
 0 ERROR
 0 WARNING
-1 NOTE
 ```
 
-The remaining NOTE is expected for a first CRAN submission:
+## Verified Checks
 
-```text
-New submission
-```
-
-## Manual Checks
-
-- PDF manual: OK
-- HTML manual: OK
+- Zero external package dependencies (base R `grDevices`, `grid`, `stats`, `tools`, `utils`)
 - Examples: OK
-- Tests: OK
-- Package load/unload: OK
-- Namespace: OK
+- Extended unit & edge-case tests (`0`-row, `0`-col, all-`NA`, RNG restoration, rename & temporal drift, S3 generics, PNG/PDF/SVG plots): OK
+- Package load/unload & namespace exports/S3 registrations: OK
 - Data files: OK
-
-## Privacy Check
-
-The source tarball was scanned for local user directories, local user names,
-workspace folder names, local tool directories, and old placeholder emails.
-
-No private path, local user-name, local toolchain, workspace-name, or
-placeholder-email hits were found in the tarball.
+- Privacy scan of built tarball: OK (`NO_PRIVATE_PATH_OR_USERNAME_HITS`)

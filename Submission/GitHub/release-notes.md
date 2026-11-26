@@ -1,32 +1,11 @@
-# DataDNA 0.1.0
+# DataDNA 0.2.0
 
-Initial public release candidate for DataDNA.
+Major quality, algorithm, and reporting upgrade for DataDNA.
 
 ## Highlights
 
-- Profile R data frames as compact data fingerprints with `data_dna()`.
-- Render portable HTML identity cards with `dna_card()`.
-- Compare table versions with `dna_compare()` and `dna_diff()`.
-- Find related historical data sets with `dna_match()`.
-- Generate report-ready PNG/PDF lineage figures with `dna_match_plot()`.
-
-## Data
-
-This release includes only small synthetic customer examples for tests and
-documentation:
-
-- `customers_old`
-- `customers_new`
-
-No commercial or production data should be committed with this release.
-
-## Check Status
-
-Local full CRAN-style check:
-
-```text
-R CMD check DataDNA_0.1.0.tar.gz --as-cran
-0 ERROR, 0 WARNING, 1 NOTE
-```
-
-The remaining NOTE is `New submission`.
+- **Zero External Dependencies**: Replaced `htmltools` with a lightweight built-in HTML5/SVG generator (`R >= 4.1.0` base packages only).
+- **Edge-Case & CRAN Hardening**: Fixed crashes on 0-row, 0-column, and all-`NA` data frames; preserved caller `.Random.seed` in `dna_example_customers()`; sharpened ID vs. low-cardinality category role inference.
+- **Smarter Drift & Rename Detection**: Added automatic column rename inference (`cust_id -> customer_id`), temporal window/regularity drift scoring, role transition tracking, and spread-aware numeric drift scaling.
+- **Batch Fingerprint Libraries**: Added `dna_library()` to stream-profile lists or directories of `.csv`, `.tsv`, `.rds`, and `.rda` files and persist compact `.rds` libraries.
+- **Full Static Figure Suite + SVG + S3 Generics**: Added `dna_plot()` and `dna_diff_plot()`, `.svg` vector export across all static plots, precision DNA electrophoresis alignment figures, interactive light/dark HTML instruments (`dna_card()`, `dna_match_card()`), and `summary()`, `plot()`, and `as.data.frame()` S3 methods.

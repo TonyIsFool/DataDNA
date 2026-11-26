@@ -5,7 +5,7 @@
 dna_species(df)
 }
 \arguments{
-\item{df}{A data frame.}
+\item{df}{A data frame or \code{data_dna} object.}
 }
 \value{
 A character label such as \code{customer_table}, \code{event_stream}, or

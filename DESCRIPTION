@@ -1,16 +1,19 @@
 Package: DataDNA
 Title: Data Frame Fingerprints and Lineage Figures
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person("Tony", "Lu", role = c("aut", "cre"),
            email = "xulunt123@gmail.com")
     )
 Description: Profiles R data frames as compact data fingerprints using schema,
-    shape, missingness, distribution, category, uniqueness, time, and role
-    signals. It compares versions, identifies close relatives in a library of
-    historical data sets, and renders portable HTML cards plus static PNG/PDF
-    lineage figures for reports.
+    shape, missingness, distribution, category, uniqueness, temporal, and role
+    signals without external package dependencies. It compares versions,
+    detects column renames and drift mutations, identifies close relatives in a
+    library of historical data sets, and renders self-contained HTML cards plus
+    static PNG, PDF, and SVG figures for reports.
 License: MIT + file LICENSE
+URL: https://github.com/TonyIsFool/DataDNA
+BugReports: https://github.com/TonyIsFool/DataDNA/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
@@ -18,4 +21,8 @@ RoxygenNote: 7.3.2
 Depends:
     R (>= 4.1.0)
 Imports:
-    htmltools
+    grDevices,
+    grid,
+    stats,
+    tools,
+    utils

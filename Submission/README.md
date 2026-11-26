@@ -6,11 +6,11 @@ in `.Rbuildignore`.
 
 ## Contents
 
-- `CRAN/DataDNA_0.1.0.tar.gz`: privacy-safe source tarball for CRAN checks.
+- `CRAN/DataDNA_0.2.0.tar.gz`: privacy-safe source tarball for CRAN checks.
 - `CRAN/cran-comments.md`: CRAN-facing check notes.
 - `CRAN/check-summary.md`: sanitized local check summary without machine paths.
-- `GitHub/release-notes.md`: short release notes for a GitHub release.
-- `sample-data/`: only two small synthetic data files for validation.
+- `GitHub/release-notes.md`: release notes for GitHub release `v0.2.0`.
+- `sample-data/`: two small synthetic data files for validation.
 
 ## Data Policy
 

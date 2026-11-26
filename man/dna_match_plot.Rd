@@ -2,11 +2,11 @@
 \alias{dna_match_plot}
 \title{Draw a paper-style lineage figure}
 \usage{
-dna_match_plot(match, file = NULL, width = 11, height = 7, dpi = 144)
+dna_match_plot(match, file = NULL, width = 11, height = 6.8, dpi = 200)
 }
 \arguments{
 \item{match}{A \code{dna_match} object.}
-\item{file}{Optional output path. Supported extensions are \code{.png} and \code{.pdf}.}
+\item{file}{Optional output path. Supported extensions are \code{.png}, \code{.pdf}, and \code{.svg}.}
 \item{width}{Plot width in inches.}
 \item{height}{Plot height in inches.}
 \item{dpi}{Resolution used for PNG output.}
@@ -17,7 +17,7 @@ The input \code{dna_match} object, invisibly.
 \description{
 Creates a print-friendly, paper-style lineage figure for a \code{dna_match}
 object using base R grid graphics. The figure can be drawn on the current
-graphics device or saved directly to PNG or PDF.
+graphics device or saved directly to PNG, PDF, or SVG.
 }
 \examples{
 demo <- dna_example_customers()

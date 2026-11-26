@@ -10,10 +10,11 @@ dna_card(x, file = NULL, open = FALSE)
 \item{open}{Logical. Open the saved file in a browser when \code{file} is supplied.}
 }
 \value{
-An \code{htmltools} browsable object, invisibly when saved to \code{file}.
+A \code{dna_html} document object, invisibly when saved to \code{file}.
 }
 \description{
-Render a laboratory-style data DNA card.
+Builds a self-contained HTML specimen card for a data frame or \code{data_dna}
+object without external runtime dependencies.
 }
 \examples{
 demo <- dna_example_customers()

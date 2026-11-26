@@ -10,10 +10,10 @@ dna_match_card(match, file = NULL, open = FALSE)
 \item{open}{Logical. Open the saved file in a browser when \code{file} is supplied.}
 }
 \value{
-An \code{htmltools} browsable object, invisibly when saved to \code{file}.
+A \code{dna_html} document object, invisibly when saved to \code{file}.
 }
 \description{
-Creates a static HTML/SVG lineage diagram for a \code{dna_match} object.
+Creates a self-contained HTML/SVG lineage diagram for a \code{dna_match} object.
 }
 \examples{
 demo <- dna_example_customers()
