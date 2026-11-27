@@ -146,6 +146,9 @@ open_report_device <- function(file, width, height, dpi) {
   } else if (ext == "pdf") {
     grDevices::pdf(file, width = width, height = height, bg = bg, useDingbats = FALSE)
   } else {
+    if (!isTRUE(suppressWarnings(capabilities("cairo")))) {
+      stop("SVG output requires Cairo graphics support (e.g., XQuartz on macOS).", call. = FALSE)
+    }
     grDevices::svg(file, width = width, height = height, bg = bg)
   }
 }

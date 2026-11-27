@@ -215,7 +215,12 @@ stopifnot(grepl("lineage-report", lineage_html, fixed = TRUE))
 stopifnot(grepl("lineage-rank", lineage_html, fixed = TRUE))
 stopifnot(grepl("lineage-summary", lineage_html, fixed = TRUE))
 
-for (ext in c(".png", ".pdf", ".svg")) {
+plot_exts <- c(".png", ".pdf")
+if (isTRUE(suppressWarnings(capabilities("cairo")))) {
+  plot_exts <- c(plot_exts, ".svg")
+}
+
+for (ext in plot_exts) {
   f_match <- tempfile(fileext = ext)
   f_spec <- tempfile(fileext = ext)
   f_diff <- tempfile(fileext = ext)
