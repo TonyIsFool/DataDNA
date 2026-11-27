@@ -215,8 +215,22 @@ stopifnot(grepl("lineage-report", lineage_html, fixed = TRUE))
 stopifnot(grepl("lineage-rank", lineage_html, fixed = TRUE))
 stopifnot(grepl("lineage-summary", lineage_html, fixed = TRUE))
 
+can_open_svg <- function() {
+  tmp_svg <- tempfile(fileext = ".svg")
+  on.exit(unlink(tmp_svg), add = TRUE)
+  tryCatch(
+    {
+      grDevices::svg(tmp_svg)
+      grDevices::dev.off()
+      file.exists(tmp_svg)
+    },
+    warning = function(w) FALSE,
+    error = function(e) FALSE
+  )
+}
+
 plot_exts <- c(".png", ".pdf")
-if (isTRUE(suppressWarnings(capabilities("cairo")))) {
+if (isTRUE(can_open_svg())) {
   plot_exts <- c(plot_exts, ".svg")
 }
 
